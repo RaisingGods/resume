@@ -207,6 +207,17 @@ p {
   position: sticky;
   top: 0;
   z-index: 60;
+}
+
+/* The frosted background lives on ::before rather than the header itself —
+   backdrop-filter on an ancestor of .site-nav would otherwise become the
+   containing block for its fixed mobile overlay, trapping it inside the
+   header's own (short) box instead of covering the full screen. */
+.site-header::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
   background: rgba(255, 255, 255, 0.92);
   backdrop-filter: blur(12px);
   border-bottom: 1px solid var(--line);
