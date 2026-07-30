@@ -1117,12 +1117,12 @@ p {
 }
 
 .partner-card__logo {
-  height: 4.2rem;
+  height: 6.5rem;
   width: auto;
   max-width: 100%;
   object-fit: contain;
   object-position: left center;
-  margin-bottom: 1.6rem;
+  margin-bottom: 1.8rem;
 }
 
 /* ---------- Founder avatar ---------- */
