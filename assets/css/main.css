@@ -110,7 +110,17 @@ p {
   width: 2rem;
   height: 1px;
   background: var(--brass);
+  transform: scaleX(1);
+  transform-origin: left;
 }
+
+/* Self-drawing line: only animates when the eyebrow itself opts into .reveal */
+.eyebrow.reveal::before {
+  transform: scaleX(0);
+  transition: transform 0.7s var(--ease) 0.1s;
+}
+
+.eyebrow.reveal.is-visible::before { transform: scaleX(1); }
 
 .section {
   padding-block: var(--space-section);
@@ -118,12 +128,21 @@ p {
 
 .section--cream { background: var(--cream); }
 .section--burgundy {
-  background: var(--burgundy);
+  position: relative;
+  background: linear-gradient(135deg, var(--burgundy) 0%, var(--burgundy-deep) 45%, var(--burgundy) 100%);
+  background-size: 220% 220%;
+  animation: burgundy-drift 28s ease-in-out infinite;
   color: var(--cream);
 }
+.section--burgundy > .container { position: relative; z-index: 1; }
 .section--burgundy h2,
 .section--burgundy h3 { color: var(--white); }
 .section--burgundy .eyebrow { color: var(--brass-light); }
+
+@keyframes burgundy-drift {
+  0%, 100% { background-position: 0% 30%; }
+  50% { background-position: 100% 70%; }
+}
 
 .lede {
   font-size: var(--step-1);
@@ -170,36 +189,64 @@ p {
 .btn--brass:hover { background: var(--brass-light); }
 
 .btn--ghost {
+  position: relative;
+  z-index: 0;
+  overflow: hidden;
   border-color: var(--line);
   color: var(--burgundy);
   background: transparent;
 }
-.btn--ghost:hover {
-  border-color: var(--burgundy);
+.btn--ghost::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: var(--brass);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.45s var(--ease);
 }
+.btn--ghost:hover {
+  border-color: var(--brass);
+  color: var(--burgundy-deep);
+}
+.btn--ghost:hover::before { transform: scaleX(1); }
 
 .section--burgundy .btn--ghost {
   border-color: var(--line-light);
   color: var(--cream);
 }
-.section--burgundy .btn--ghost:hover { border-color: var(--brass-light); color: var(--brass-light); }
+.section--burgundy .btn--ghost:hover { border-color: var(--brass-light); color: var(--burgundy-deep); }
 
 .text-link {
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
+  position: relative;
   font-size: 0.82rem;
   font-weight: 600;
   letter-spacing: 0.12em;
   text-transform: uppercase;
   text-decoration: none;
   color: var(--brass);
-  border-bottom: 1px solid transparent;
   padding-bottom: 2px;
-  transition: color 0.3s var(--ease), border-color 0.3s var(--ease);
+  transition: color 0.3s var(--ease);
 }
-.text-link:hover { color: var(--burgundy); border-color: var(--burgundy); }
-.section--burgundy .text-link:hover { color: var(--brass-light); border-color: var(--brass-light); }
+.text-link::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 1px;
+  background: currentColor;
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.4s var(--ease);
+}
+.text-link:hover { color: var(--burgundy); }
+.text-link:hover::after { transform: scaleX(1); }
+.section--burgundy .text-link:hover { color: var(--brass-light); }
 
 /* ---------- Header ---------- */
 
@@ -592,16 +639,35 @@ p {
 }
 
 .framework-cell {
+  position: relative;
+  overflow: hidden;
   background: rgba(250, 246, 239, 0.05);
+  backdrop-filter: blur(10px);
   border: 1px solid var(--line-light);
   padding: 2rem 1.8rem;
   counter-increment: framework;
-  transition: background 0.4s var(--ease), border-color 0.4s var(--ease);
+  transition: background 0.4s var(--ease), border-color 0.4s var(--ease), transform 0.4s var(--ease);
 }
+
+.framework-cell::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--brass);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.9s var(--ease) 0.15s;
+}
+
+.framework-cell.is-visible::after { transform: scaleX(1); }
 
 .framework-cell:hover {
   background: rgba(250, 246, 239, 0.09);
   border-color: rgba(210, 171, 97, 0.55);
+  transform: translateY(-4px);
 }
 
 .framework-cell::before {
@@ -946,13 +1012,16 @@ p {
 
 .reveal {
   opacity: 0;
-  transform: translateY(28px);
-  transition: opacity 0.9s var(--ease), transform 0.9s var(--ease);
+  transform: translateY(28px) scale(0.985);
+  filter: blur(6px);
+  transition: opacity 0.9s var(--ease), transform 0.9s var(--ease), filter 0.9s var(--ease);
+  will-change: opacity, transform, filter;
 }
 
 .reveal.is-visible {
   opacity: 1;
   transform: none;
+  filter: blur(0);
 }
 
 .reveal[data-delay="1"] { transition-delay: 0.12s; }
@@ -961,8 +1030,13 @@ p {
 
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
-  .reveal { opacity: 1; transform: none; transition: none; }
+  .reveal { opacity: 1; transform: none; filter: none; transition: none; }
   .card, .btn, .btn svg { transition: none; }
+  .section--burgundy { animation: none !important; }
+  .particle-field { display: none !important; }
+  .word .word__inner { transform: none !important; transition: none !important; }
+  .cursor-glow { display: none !important; }
+  .fw-svg__fill, .fw-svg__node circle, .fw-svg__node text { transition: none !important; }
 }
 
 /* ---------- Stat counters ---------- */
@@ -1370,4 +1444,188 @@ p {
 :focus-visible {
   outline: 2px solid var(--brass);
   outline-offset: 2px;
+}
+
+/* ============================================================
+   Cinematic layer — atmosphere, depth, signature interaction
+   ============================================================ */
+
+/* ---------- Grain texture (sitewide, near-invisible) ---------- */
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  pointer-events: none;
+  opacity: 0.035;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* ---------- Drifting brass particles (burgundy sections) ---------- */
+
+.particle-field {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.particle-field span {
+  position: absolute;
+  bottom: -12px;
+  left: var(--x, 50%);
+  width: var(--size, 5px);
+  height: var(--size, 5px);
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--brass-light), transparent 70%);
+  opacity: 0;
+  filter: blur(0.5px);
+  animation: particle-float var(--dur, 16s) ease-in var(--delay, 0s) infinite;
+}
+
+@keyframes particle-float {
+  0% { transform: translateY(0) translateX(0); opacity: 0; }
+  8% { opacity: 0.55; }
+  85% { opacity: 0.3; }
+  100% { transform: translateY(-340px) translateX(var(--drift, 24px)); opacity: 0; }
+}
+
+/* ---------- Cursor halo (desktop pointer only, added via JS) ---------- */
+
+.cursor-glow {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 340px;
+  height: 340px;
+  margin: -170px 0 0 -170px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(210, 171, 97, 0.16), transparent 70%);
+  pointer-events: none;
+  z-index: 5;
+  opacity: 0;
+  transition: opacity 0.4s var(--ease);
+  will-change: transform;
+}
+
+.cursor-glow.is-active { opacity: 1; }
+
+/* ---------- Word-by-word heading reveal ---------- */
+
+.word-reveal .word {
+  display: inline-block;
+  overflow: hidden;
+  vertical-align: top;
+  padding-bottom: 0.08em;
+}
+
+.word-reveal .word__inner {
+  display: inline-block;
+  transform: translateY(115%);
+  transition: transform 0.85s var(--ease);
+  transition-delay: calc(var(--i, 0) * 0.05s);
+}
+
+.word-reveal.is-visible .word__inner { transform: translateY(0); }
+
+/* ---------- Signature interaction: the framework builds itself ---------- */
+
+.framework-map {
+  align-items: start;
+}
+
+.fw-svg-wrap { padding-block: 1rem; }
+
+.fw-svg {
+  width: 100%;
+  max-width: 150px;
+  height: auto;
+  overflow: visible;
+  margin-inline: auto;
+}
+
+.fw-svg__track {
+  stroke: var(--line);
+  stroke-width: 2;
+  fill: none;
+}
+
+.fw-svg__fill {
+  stroke: var(--brass);
+  stroke-width: 2;
+  fill: none;
+  stroke-dasharray: 420;
+  stroke-dashoffset: 420;
+  transition: stroke-dashoffset 0.7s var(--ease);
+}
+
+.fw-svg__node circle {
+  fill: var(--white);
+  stroke: var(--line);
+  stroke-width: 2;
+  transform-box: fill-box;
+  transform-origin: center;
+  transition: fill 0.4s var(--ease), stroke 0.4s var(--ease), transform 0.4s var(--ease);
+}
+
+.fw-svg__node text {
+  font-family: var(--font-display);
+  font-size: 9px;
+  fill: var(--ink-soft);
+  text-anchor: middle;
+  dominant-baseline: middle;
+  transition: fill 0.4s var(--ease);
+}
+
+.fw-svg__node.is-active circle {
+  fill: var(--brass);
+  stroke: var(--brass);
+  transform: scale(1.4);
+}
+
+.fw-svg__node.is-active text { fill: var(--white); }
+
+.fw-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.fw-step {
+  padding: 1.5rem 0 1.5rem 1.7rem;
+  border-left: 2px solid var(--line);
+  opacity: 0.5;
+  transition: opacity 0.5s var(--ease), border-color 0.5s var(--ease), transform 0.5s var(--ease);
+}
+
+.fw-step.is-active {
+  opacity: 1;
+  border-color: var(--brass);
+  transform: translateX(4px);
+}
+
+.fw-step h3 {
+  font-size: 1.05rem;
+  font-family: var(--font-body);
+  font-weight: 600;
+  color: var(--burgundy);
+  margin-bottom: 0.3em;
+}
+
+.fw-step p { font-size: var(--step--1); color: var(--ink-soft); margin: 0; max-width: 46ch; }
+
+@media (max-width: 879px) {
+  /* The side diagram relies on the sticky column that only exists ≥880px;
+     stacked on mobile it would render as a very tall, mostly-empty block
+     ahead of the actual steps, so it's hidden here. The steps themselves
+     still highlight one at a time via the same scroll observer. */
+  .fw-svg-wrap { display: none; }
+  .fw-step { border-left-width: 3px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body::before { display: none; }
 }

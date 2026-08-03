@@ -94,6 +94,167 @@
     });
   }
 
+  /* Word-by-word heading reveal */
+  function wrapWordsForReveal(el) {
+    function walk(node) {
+      Array.prototype.slice.call(node.childNodes).forEach(function (child) {
+        if (child.nodeType === 3) {
+          var parts = child.textContent.split(/(\s+)/).filter(function (p) { return p.length; });
+          var frag = document.createDocumentFragment();
+          parts.forEach(function (part) {
+            if (/^\s+$/.test(part)) {
+              frag.appendChild(document.createTextNode(part));
+              return;
+            }
+            var outer = document.createElement("span");
+            outer.className = "word";
+            var inner = document.createElement("span");
+            inner.className = "word__inner";
+            inner.textContent = part;
+            outer.appendChild(inner);
+            frag.appendChild(outer);
+          });
+          node.replaceChild(frag, child);
+        } else if (child.nodeType === 1) {
+          walk(child);
+        }
+      });
+    }
+    walk(el);
+
+    var index = 0;
+    el.querySelectorAll(".word__inner").forEach(function (inner) {
+      inner.style.setProperty("--i", index);
+      index++;
+    });
+  }
+
+  var splitEls = document.querySelectorAll("[data-split-words]");
+  if (splitEls.length) {
+    splitEls.forEach(function (el) {
+      wrapWordsForReveal(el);
+      el.classList.add("word-reveal");
+    });
+
+    if ("IntersectionObserver" in window) {
+      var splitObserver = new IntersectionObserver(
+        function (entries) {
+          entries.forEach(function (entry) {
+            if (entry.isIntersecting) {
+              entry.target.classList.add("is-visible");
+              splitObserver.unobserve(entry.target);
+            }
+          });
+        },
+        { threshold: 0.4 }
+      );
+      splitEls.forEach(function (el) { splitObserver.observe(el); });
+    } else {
+      splitEls.forEach(function (el) { el.classList.add("is-visible"); });
+    }
+  }
+
+  /* Ambient motion — magnetic buttons, cursor halo, drifting particles */
+  var prefersReducedMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var hasFinePointer = window.matchMedia && window.matchMedia("(pointer: fine)").matches;
+
+  if (!prefersReducedMotion && hasFinePointer) {
+    document.querySelectorAll(".btn").forEach(function (btn) {
+      btn.addEventListener("mousemove", function (e) {
+        var rect = btn.getBoundingClientRect();
+        var x = e.clientX - rect.left - rect.width / 2;
+        var y = e.clientY - rect.top - rect.height / 2;
+        btn.style.transform = "translate(" + (x * 0.18).toFixed(1) + "px, " + (y * 0.35).toFixed(1) + "px)";
+      });
+      btn.addEventListener("mouseleave", function () {
+        btn.style.transform = "";
+      });
+    });
+
+    var glow = document.createElement("div");
+    glow.className = "cursor-glow";
+    document.body.appendChild(glow);
+    var glowRaf = null;
+    var glowX = 0;
+    var glowY = 0;
+
+    document.addEventListener("mousemove", function (e) {
+      glowX = e.clientX;
+      glowY = e.clientY;
+      glow.classList.add("is-active");
+      if (!glowRaf) {
+        glowRaf = requestAnimationFrame(function () {
+          glow.style.transform = "translate(" + glowX + "px, " + glowY + "px)";
+          glowRaf = null;
+        });
+      }
+    });
+
+    document.addEventListener("mouseleave", function () {
+      glow.classList.remove("is-active");
+    });
+  }
+
+  if (!prefersReducedMotion) {
+    document.querySelectorAll(".section--burgundy").forEach(function (section) {
+      if (section.querySelector(".particle-field")) return;
+      var field = document.createElement("div");
+      field.className = "particle-field";
+      field.setAttribute("aria-hidden", "true");
+      for (var i = 0; i < 6; i++) {
+        var span = document.createElement("span");
+        var size = 3 + Math.random() * 4;
+        span.style.setProperty("--size", size.toFixed(1) + "px");
+        span.style.setProperty("--x", (Math.random() * 100).toFixed(1) + "%");
+        span.style.setProperty("--dur", (12 + Math.random() * 10).toFixed(1) + "s");
+        span.style.setProperty("--delay", (Math.random() * -20).toFixed(1) + "s");
+        span.style.setProperty("--drift", (Math.random() * 40 - 20).toFixed(1) + "px");
+        field.appendChild(span);
+      }
+      section.insertBefore(field, section.firstChild);
+    });
+  }
+
+  /* Signature interaction — the Safe Influence Framework builds itself */
+  var fwSteps = document.querySelectorAll(".fw-step");
+  var fwFill = document.querySelector(".fw-svg__fill");
+
+  if (fwSteps.length && "IntersectionObserver" in window) {
+    var fwTotal = fwSteps.length - 1;
+    var fwActiveMax = -1;
+    var fwLineLength = 420;
+
+    function updateFwFill() {
+      if (!fwFill || fwTotal <= 0) return;
+      var progress = fwActiveMax < 0 ? 0 : fwActiveMax / fwTotal;
+      fwFill.style.strokeDashoffset = (fwLineLength * (1 - progress)).toFixed(1);
+    }
+
+    /* Trigger zone is a thin line at vertical center — so with any viewport
+       height, steps activate one at a time as they cross it, rather than
+       all at once whenever they happen to fit on one screen. */
+    var fwObserver = new IntersectionObserver(
+      function (entries) {
+        entries.forEach(function (entry) {
+          var index = parseInt(entry.target.dataset.nodeIndex, 10);
+          var node = document.querySelector('.fw-svg__node[data-node-index="' + index + '"]');
+          if (entry.isIntersecting) {
+            entry.target.classList.add("is-active");
+            if (node) node.classList.add("is-active");
+            if (index > fwActiveMax) fwActiveMax = index;
+          } else {
+            entry.target.classList.remove("is-active");
+            if (node) node.classList.remove("is-active");
+          }
+          updateFwFill();
+        });
+      },
+      { threshold: 0, rootMargin: "-48% 0px -48% 0px" }
+    );
+
+    fwSteps.forEach(function (step) { fwObserver.observe(step); });
+  }
+
   /* Tabs (pillars, etc.) */
   document.querySelectorAll("[data-tabs]").forEach(function (group) {
     var tabs = group.querySelectorAll(".tabs__tab");
