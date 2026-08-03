@@ -1223,8 +1223,11 @@ p {
 /* ---------- Founder avatar ---------- */
 
 .founder-avatar {
+  position: relative;
+  overflow: hidden;
   width: 11rem;
   height: 11rem;
+  flex: none;
   border-radius: 50%;
   display: grid;
   place-items: center;
@@ -1238,6 +1241,8 @@ p {
 }
 
 .founder-avatar img {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
   border-radius: 50%;
