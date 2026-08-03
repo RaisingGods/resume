@@ -822,11 +822,20 @@ p {
   margin-bottom: 1.2rem;
 }
 
+.press-card__strip--2 { grid-template-columns: repeat(2, 1fr); }
+.press-card__strip--4 { grid-template-columns: repeat(4, 1fr); }
+
 .press-card__strip img { height: 16rem; margin-bottom: 0; }
 
 @media (max-width: 640px) {
-  .press-card__strip { grid-template-columns: 1fr; }
+  .press-card__strip,
+  .press-card__strip--2,
+  .press-card__strip--4 { grid-template-columns: 1fr; }
   .press-card__strip img { height: 20rem; }
+}
+
+@media (min-width: 641px) and (max-width: 900px) {
+  .press-card__strip--4 { grid-template-columns: repeat(2, 1fr); }
 }
 
 .press-card__outlet {
