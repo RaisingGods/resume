@@ -1330,6 +1330,7 @@ p {
 .founder-avatar--large {
   width: 16rem;
   height: 16rem;
+  margin-top: 2.8rem;
 }
 
 .partner-card__tag {
