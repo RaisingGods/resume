@@ -2,6 +2,42 @@
 (function () {
   "use strict";
 
+  var prefersReducedMotionMQ = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)");
+  var prefersReducedMotion = !!(prefersReducedMotionMQ && prefersReducedMotionMQ.matches);
+  var hasGSAP = typeof window.gsap !== "undefined";
+  var hasScrollTrigger = hasGSAP && typeof window.ScrollTrigger !== "undefined";
+
+  if (hasScrollTrigger) {
+    gsap.registerPlugin(ScrollTrigger);
+  }
+
+  /* Smooth, inertia-driven scroll — skipped entirely under reduced motion
+     so the browser falls back to plain native scrolling. */
+  var lenis = null;
+  if (!prefersReducedMotion && typeof window.Lenis !== "undefined") {
+    lenis = new Lenis({ duration: 1.1, smoothWheel: true });
+    if (hasGSAP) {
+      lenis.on("scroll", hasScrollTrigger ? ScrollTrigger.update : function () {});
+      gsap.ticker.add(function (time) { lenis.raf(time * 1000); });
+      gsap.ticker.lagSmoothing(0);
+    } else {
+      requestAnimationFrame(function raf(time) {
+        lenis.raf(time);
+        requestAnimationFrame(raf);
+      });
+    }
+  }
+
+  /* Context-aware nav — transparent over the hero, solid once scrolled */
+  var header = document.querySelector(".site-header");
+  if (header) {
+    var updateHeaderState = function () {
+      header.classList.toggle("is-scrolled", window.scrollY > 40);
+    };
+    updateHeaderState();
+    window.addEventListener("scroll", updateHeaderState, { passive: true });
+  }
+
   /* Mobile navigation */
   var toggle = document.querySelector(".nav-toggle");
   var nav = document.querySelector(".site-nav");
@@ -94,9 +130,16 @@
     });
   }
 
-  /* Word-by-word heading reveal */
-  function wrapWordsForReveal(el) {
-    function walk(node) {
+  /* Kinetic typography — staggered line-mask reveal.
+     Each word is temporarily wrapped to measure which visual line it falls
+     on (line breaks depend on viewport width), then the words on each line
+     are regrouped into an overflow:hidden mask with an inner span that
+     slides up from below — the "feeding up" effect, one line at a time. */
+  function buildLineReveal(el) {
+    if (!el.__lrSource) el.__lrSource = el.innerHTML;
+    el.innerHTML = el.__lrSource;
+
+    function walk(node, wrapTag) {
       Array.prototype.slice.call(node.childNodes).forEach(function (child) {
         if (child.nodeType === 3) {
           var parts = child.textContent.split(/(\s+)/).filter(function (p) { return p.length; });
@@ -106,56 +149,86 @@
               frag.appendChild(document.createTextNode(part));
               return;
             }
-            var outer = document.createElement("span");
-            outer.className = "word";
-            var inner = document.createElement("span");
-            inner.className = "word__inner";
-            inner.textContent = part;
-            outer.appendChild(inner);
-            frag.appendChild(outer);
+            var span = document.createElement("span");
+            span.className = "lr-word";
+            span.dataset.wrapTag = wrapTag || "";
+            span.textContent = part;
+            frag.appendChild(span);
           });
           node.replaceChild(frag, child);
         } else if (child.nodeType === 1) {
-          walk(child);
+          walk(child, child.tagName.toLowerCase());
         }
       });
     }
-    walk(el);
+    walk(el, null);
 
-    var index = 0;
-    el.querySelectorAll(".word__inner").forEach(function (inner) {
-      inner.style.setProperty("--i", index);
-      index++;
+    var words = Array.prototype.slice.call(el.querySelectorAll(".lr-word"));
+    var lines = [];
+    var lastTop = null;
+    words.forEach(function (w) {
+      var top = w.offsetTop;
+      if (lastTop === null || Math.abs(top - lastTop) > 4) {
+        lines.push([]);
+        lastTop = top;
+      }
+      lines[lines.length - 1].push(w);
     });
+
+    el.innerHTML = "";
+    lines.forEach(function (lineWords, i) {
+      var mask = document.createElement("span");
+      mask.className = "line-mask";
+      var inner = document.createElement("span");
+      inner.className = "line-mask__inner";
+      inner.style.transitionDelay = (i * 0.08).toFixed(2) + "s";
+      lineWords.forEach(function (w, wi) {
+        var wrapTag = w.dataset.wrapTag;
+        var node = wrapTag ? document.createElement(wrapTag) : document.createTextNode(w.textContent);
+        if (wrapTag) { node.textContent = w.textContent; }
+        inner.appendChild(node);
+        if (wi < lineWords.length - 1) inner.appendChild(document.createTextNode(" "));
+      });
+      mask.appendChild(inner);
+      el.appendChild(mask);
+      if (i < lines.length - 1) el.appendChild(document.createTextNode(" "));
+    });
+
+    el.classList.add("lr-armed");
   }
 
-  var splitEls = document.querySelectorAll("[data-split-words]");
-  if (splitEls.length) {
-    splitEls.forEach(function (el) {
-      wrapWordsForReveal(el);
-      el.classList.add("word-reveal");
-    });
+  var lineRevealEls = document.querySelectorAll("[data-line-reveal]");
+  if (lineRevealEls.length) {
+    lineRevealEls.forEach(function (el) { buildLineReveal(el); });
 
-    if ("IntersectionObserver" in window) {
-      var splitObserver = new IntersectionObserver(
-        function (entries) {
-          entries.forEach(function (entry) {
-            if (entry.isIntersecting) {
-              entry.target.classList.add("is-visible");
-              splitObserver.unobserve(entry.target);
-            }
+    if (!prefersReducedMotion) {
+      /* Hero headlines are already in view at load — play the entrance
+         immediately rather than waiting on a scroll trigger. */
+      requestAnimationFrame(function () {
+        requestAnimationFrame(function () {
+          lineRevealEls.forEach(function (el) {
+            setTimeout(function () { el.classList.add("is-visible"); }, 150);
           });
-        },
-        { threshold: 0.4 }
-      );
-      splitEls.forEach(function (el) { splitObserver.observe(el); });
+        });
+      });
+
+      var lrResizeTimer;
+      window.addEventListener("resize", function () {
+        clearTimeout(lrResizeTimer);
+        lrResizeTimer = setTimeout(function () {
+          lineRevealEls.forEach(function (el) {
+            var wasVisible = el.classList.contains("is-visible");
+            buildLineReveal(el);
+            if (wasVisible) { el.classList.add("is-visible"); }
+          });
+        }, 200);
+      });
     } else {
-      splitEls.forEach(function (el) { el.classList.add("is-visible"); });
+      lineRevealEls.forEach(function (el) { el.classList.add("is-visible"); });
     }
   }
 
-  /* Ambient motion — magnetic buttons, cursor halo, drifting particles */
-  var prefersReducedMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  /* Ambient motion — magnetic buttons, custom cursor, drifting particles */
   var hasFinePointer = window.matchMedia && window.matchMedia("(pointer: fine)").matches;
 
   if (!prefersReducedMotion && hasFinePointer) {
@@ -193,6 +266,53 @@
     document.addEventListener("mouseleave", function () {
       glow.classList.remove("is-active");
     });
+
+    /* Custom cursor — a small dot that tracks the pointer, expanding into
+       a text label when hovering anything tagged data-cursor-label. */
+    document.documentElement.classList.add("has-custom-cursor");
+
+    var cursorDot = document.createElement("div");
+    cursorDot.className = "cursor-dot";
+    var cursorLabel = document.createElement("div");
+    cursorLabel.className = "cursor-label";
+    document.body.appendChild(cursorDot);
+    document.body.appendChild(cursorLabel);
+
+    var moveDot, moveLabel;
+    if (hasGSAP) {
+      var setDotX = gsap.quickTo(cursorDot, "x", { duration: 0.18, ease: "power3" });
+      var setDotY = gsap.quickTo(cursorDot, "y", { duration: 0.18, ease: "power3" });
+      var setLabelX = gsap.quickTo(cursorLabel, "x", { duration: 0.32, ease: "power3" });
+      var setLabelY = gsap.quickTo(cursorLabel, "y", { duration: 0.32, ease: "power3" });
+      moveDot = function (x, y) { setDotX(x); setDotY(y); };
+      moveLabel = function (x, y) { setLabelX(x); setLabelY(y); };
+    } else {
+      moveDot = function (x, y) { cursorDot.style.transform = "translate(" + x + "px," + y + "px)"; };
+      moveLabel = function (x, y) { cursorLabel.style.transform = "translate(" + x + "px," + y + "px)"; };
+    }
+
+    document.addEventListener("mousemove", function (e) {
+      moveDot(e.clientX, e.clientY);
+      moveLabel(e.clientX, e.clientY);
+      cursorDot.classList.add("is-active");
+    });
+
+    document.addEventListener("mouseleave", function () {
+      cursorDot.classList.remove("is-active");
+      cursorLabel.classList.remove("is-active");
+    });
+
+    document.querySelectorAll("[data-cursor-label]").forEach(function (el) {
+      el.addEventListener("mouseenter", function () {
+        cursorLabel.textContent = el.dataset.cursorLabel;
+        cursorLabel.classList.add("is-active");
+        cursorDot.classList.add("is-hovering");
+      });
+      el.addEventListener("mouseleave", function () {
+        cursorLabel.classList.remove("is-active");
+        cursorDot.classList.remove("is-hovering");
+      });
+    });
   }
 
   if (!prefersReducedMotion) {
@@ -215,11 +335,45 @@
     });
   }
 
-  /* Signature interaction — the Safe Influence Framework builds itself */
+  /* Signature interaction — the Safe Influence Framework builds itself.
+     With GSAP + ScrollTrigger available, the diagram column pins in place
+     while the SVG line draws continuously (scrubbed to scroll position,
+     not a timer) and each step lights up in turn — genuine pinned
+     storytelling. Falls back to the plain IntersectionObserver version
+     (sticky via CSS, discrete step activation) if either library failed
+     to load. */
   var fwSteps = document.querySelectorAll(".fw-step");
   var fwFill = document.querySelector(".fw-svg__fill");
+  var fwMap = document.querySelector(".framework-map");
+  var fwSticky = document.querySelector(".framework-map .split__sticky");
 
-  if (fwSteps.length && "IntersectionObserver" in window) {
+  if (fwSteps.length && hasScrollTrigger && fwMap && fwSticky && window.matchMedia("(min-width: 880px)").matches) {
+    var fwTotalP = fwSteps.length - 1;
+    var fwLineLengthP = 420;
+    var fwActiveMaxP = -1;
+
+    ScrollTrigger.create({
+      trigger: fwMap,
+      start: "top top+=90",
+      end: "bottom bottom",
+      pin: fwSticky,
+      pinSpacing: false,
+      scrub: 0.6,
+      onUpdate: function (self) {
+        if (fwFill) {
+          fwFill.style.strokeDashoffset = (fwLineLengthP * (1 - self.progress)).toFixed(1);
+        }
+        var activeIndex = Math.round(self.progress * fwTotalP);
+        if (activeIndex > fwActiveMaxP) fwActiveMaxP = activeIndex;
+        fwSteps.forEach(function (step, i) {
+          var isActive = i <= fwActiveMaxP;
+          step.classList.toggle("is-active", isActive);
+          var node = document.querySelector('.fw-svg__node[data-node-index="' + i + '"]');
+          if (node) node.classList.toggle("is-active", isActive);
+        });
+      }
+    });
+  } else if (fwSteps.length && "IntersectionObserver" in window) {
     var fwTotal = fwSteps.length - 1;
     var fwActiveMax = -1;
     var fwLineLength = 420;

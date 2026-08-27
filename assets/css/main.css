@@ -35,6 +35,7 @@
   --max: 78rem;
 
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 *,
@@ -45,6 +46,7 @@
 
 html {
   scroll-behavior: smooth;
+  scroll-padding-top: 5rem;
 }
 
 body {
@@ -170,7 +172,7 @@ p {
   border-radius: 999px;
   cursor: pointer;
   transition: background 0.35s var(--ease), color 0.35s var(--ease),
-    border-color 0.35s var(--ease), transform 0.35s var(--ease);
+    border-color 0.35s var(--ease), transform 0.5s var(--ease-spring);
 }
 
 .btn svg { transition: transform 0.35s var(--ease); }
@@ -251,15 +253,19 @@ p {
 /* ---------- Header ---------- */
 
 .site-header {
-  position: sticky;
+  position: fixed;
   top: 0;
+  left: 0;
+  right: 0;
   z-index: 60;
 }
 
 /* The frosted background lives on ::before rather than the header itself —
    backdrop-filter on an ancestor of .site-nav would otherwise become the
    containing block for its fixed mobile overlay, trapping it inside the
-   header's own (short) box instead of covering the full screen. */
+   header's own (short) box instead of covering the full screen.
+   It starts fully transparent so the header floats over the hero, then
+   fades in solid once the page scrolls — a context-aware nav. */
 .site-header::before {
   content: "";
   position: absolute;
@@ -267,6 +273,29 @@ p {
   z-index: -1;
   background: var(--white);
   border-bottom: 1px solid var(--line);
+  opacity: 0;
+  transition: opacity 0.5s var(--ease);
+}
+
+.site-header.is-scrolled::before { opacity: 1; }
+
+.site-header .brand__name { color: var(--cream); transition: color 0.5s var(--ease); }
+.site-header .brand__hq { color: var(--brass-light); transition: color 0.5s var(--ease); }
+.site-header.is-scrolled .brand__name { color: var(--burgundy); }
+.site-header.is-scrolled .brand__hq { color: var(--brass); }
+
+.site-header .nav-toggle { border-color: rgba(250, 246, 239, 0.35); transition: border-color 0.5s var(--ease); }
+.site-header .nav-toggle span { background: var(--cream); }
+.site-header.is-scrolled .nav-toggle { border-color: var(--line); }
+.site-header.is-scrolled .nav-toggle span { background: var(--burgundy); }
+
+@media (min-width: 961px) {
+  .site-header .site-nav a:not(.btn) { color: rgba(250, 246, 239, 0.82); }
+  .site-header .site-nav a:not(.btn):hover,
+  .site-header .site-nav a[aria-current="page"] { color: var(--white); border-color: var(--brass-light); }
+  .site-header.is-scrolled .site-nav a:not(.btn) { color: var(--ink-soft); }
+  .site-header.is-scrolled .site-nav a:not(.btn):hover,
+  .site-header.is-scrolled .site-nav a[aria-current="page"] { color: var(--burgundy); border-color: var(--brass); }
 }
 
 .site-header__inner {
@@ -1788,4 +1817,89 @@ body::before {
 
 @media (prefers-reduced-motion: reduce) {
   body::before { display: none; }
+}
+
+/* ---------- Kinetic line reveal (masked headline entrance) ---------- */
+
+.line-mask {
+  display: block;
+  overflow: hidden;
+}
+
+.line-mask__inner {
+  display: block;
+}
+
+[data-line-reveal].lr-armed .line-mask__inner {
+  transform: translateY(112%);
+  transition: transform 0.9s var(--ease-spring);
+}
+
+[data-line-reveal].lr-armed.is-visible .line-mask__inner {
+  transform: translateY(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-line-reveal].lr-armed .line-mask__inner {
+    transform: none;
+    transition: none;
+  }
+}
+
+/* ---------- Custom cursor (desktop pointer only, injected via JS) ---------- */
+
+.cursor-dot,
+.cursor-label {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 200;
+  pointer-events: none;
+  will-change: transform;
+}
+
+.cursor-dot {
+  width: 10px;
+  height: 10px;
+  margin: -5px 0 0 -5px;
+  border-radius: 50%;
+  background: var(--brass);
+  opacity: 0;
+  transition: opacity 0.3s var(--ease), background 0.3s var(--ease);
+}
+
+.cursor-dot.is-active { opacity: 1; }
+.cursor-dot.is-hovering { background: var(--burgundy); }
+
+.cursor-label {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 3.6rem;
+  height: 3.6rem;
+  padding: 0 0.6rem;
+  margin: -1.8rem 0 0 -1.8rem;
+  border-radius: 999px;
+  background: var(--burgundy);
+  color: var(--cream);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  opacity: 0;
+  transform: scale(0.4);
+  transition: opacity 0.35s var(--ease-spring), transform 0.35s var(--ease-spring);
+}
+
+.cursor-label.is-active { opacity: 1; transform: scale(1); }
+
+html.has-custom-cursor,
+html.has-custom-cursor a,
+html.has-custom-cursor button,
+html.has-custom-cursor [role="button"] {
+  cursor: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cursor-dot, .cursor-label { display: none !important; }
 }
