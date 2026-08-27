@@ -11,31 +11,22 @@
     gsap.registerPlugin(ScrollTrigger);
   }
 
-  /* Smooth, inertia-driven scroll — skipped entirely under reduced motion
-     so the browser falls back to plain native scrolling. */
-  var lenis = null;
-  if (!prefersReducedMotion && typeof window.Lenis !== "undefined") {
-    lenis = new Lenis({ duration: 1.1, smoothWheel: true });
-    if (hasGSAP) {
-      lenis.on("scroll", hasScrollTrigger ? ScrollTrigger.update : function () {});
-      gsap.ticker.add(function (time) { lenis.raf(time * 1000); });
-      gsap.ticker.lagSmoothing(0);
-    } else {
-      requestAnimationFrame(function raf(time) {
-        lenis.raf(time);
-        requestAnimationFrame(raf);
-      });
-    }
-  }
-
-  /* Context-aware nav — transparent over the hero, solid once scrolled */
+  /* Context-aware nav — transparent over the hero, solid once scrolled.
+     rAF-batched so it never runs more than once per frame. */
   var header = document.querySelector(".site-header");
   if (header) {
+    var headerTick = false;
     var updateHeaderState = function () {
       header.classList.toggle("is-scrolled", window.scrollY > 40);
+      headerTick = false;
     };
     updateHeaderState();
-    window.addEventListener("scroll", updateHeaderState, { passive: true });
+    window.addEventListener("scroll", function () {
+      if (!headerTick) {
+        headerTick = true;
+        requestAnimationFrame(updateHeaderState);
+      }
+    }, { passive: true });
   }
 
   /* Mobile navigation */
