@@ -567,7 +567,7 @@ p {
   max-width: 18ch;
 }
 
-.page-hero p {
+.page-hero p:not(.eyebrow) {
   font-size: var(--step-1);
   line-height: 1.55;
   color: rgba(250, 246, 239, 0.8);
