@@ -263,9 +263,7 @@ p {
 /* The frosted background lives on ::before rather than the header itself —
    backdrop-filter on an ancestor of .site-nav would otherwise become the
    containing block for its fixed mobile overlay, trapping it inside the
-   header's own (short) box instead of covering the full screen.
-   It starts fully transparent so the header floats over the hero, then
-   fades in solid once the page scrolls — a context-aware nav. */
+   header's own (short) box instead of covering the full screen. */
 .site-header::before {
   content: "";
   position: absolute;
@@ -273,29 +271,6 @@ p {
   z-index: -1;
   background: var(--white);
   border-bottom: 1px solid var(--line);
-  opacity: 0;
-  transition: opacity 0.5s var(--ease);
-}
-
-.site-header.is-scrolled::before { opacity: 1; }
-
-.site-header .brand__name { color: var(--cream); transition: color 0.5s var(--ease); }
-.site-header .brand__hq { color: var(--brass-light); transition: color 0.5s var(--ease); }
-.site-header.is-scrolled .brand__name { color: var(--burgundy); }
-.site-header.is-scrolled .brand__hq { color: var(--brass); }
-
-.site-header .nav-toggle { border-color: rgba(250, 246, 239, 0.35); transition: border-color 0.5s var(--ease); }
-.site-header .nav-toggle span { background: var(--cream); }
-.site-header.is-scrolled .nav-toggle { border-color: var(--line); }
-.site-header.is-scrolled .nav-toggle span { background: var(--burgundy); }
-
-@media (min-width: 961px) {
-  .site-header .site-nav a:not(.btn) { color: rgba(250, 246, 239, 0.82); }
-  .site-header .site-nav a:not(.btn):hover,
-  .site-header .site-nav a[aria-current="page"] { color: var(--white); border-color: var(--brass-light); }
-  .site-header.is-scrolled .site-nav a:not(.btn) { color: var(--ink-soft); }
-  .site-header.is-scrolled .site-nav a:not(.btn):hover,
-  .site-header.is-scrolled .site-nav a[aria-current="page"] { color: var(--burgundy); border-color: var(--brass); }
 }
 
 .site-header__inner {
@@ -1810,9 +1785,19 @@ body::before {
   /* The side diagram relies on the sticky column that only exists ≥880px;
      stacked on mobile it would render as a very tall, mostly-empty block
      ahead of the actual steps, so it's hidden here. The steps themselves
-     still highlight one at a time via the same scroll observer. */
+     still highlight one at a time via the same scroll observer, and get
+     their own number badge since the diagram's numbered nodes are gone. */
   .fw-svg-wrap { display: none; }
-  .fw-step { border-left-width: 3px; }
+  .fw-steps { counter-reset: fwstep; }
+  .fw-step { border-left-width: 3px; counter-increment: fwstep; }
+  .fw-step::before {
+    content: "0" counter(fwstep);
+    display: block;
+    font-family: var(--font-display);
+    font-size: 0.9rem;
+    color: var(--brass);
+    margin-bottom: 0.5rem;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
